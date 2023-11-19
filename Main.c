@@ -6,15 +6,17 @@
 typedef unsigned int uint;
 typedef unsigned char uchar;
 typedef char bool;
-
+/*
+{{14, 29, 30, 31, 16},
+{16, 17, 2, -13, -14}};
+*/
 const char checkPatterns[2][5] = {{14, 29, 30, 31, 16},
 																	{16, 17, 2, -13, -14}};
-
 const char dirNormals[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
-const char dirBias[4] = {1, 1, 1, 1};
-
-const double turnBias = 0.8;
+const double axisBias = 0.5; // 0 = horizontal only, 1 = vertical only
+const double straightBias = 0.9;
+const double momentumBias = 0.1;
 
 BMP* bmp;
 
@@ -82,7 +84,8 @@ int main(int argc, char** argv){
 	uint startx, starty;
   uint x, y;
 	uchar distance = 0;
-	uchar moveDir = 5; // So it can be checked
+	uchar moveDir = 5; // 5 So it can be checked by straight bias
+	uchar lastTurnDir = 5;
 
 	// Assign start values
 	startx = x = atoi(argv[3]);
@@ -99,48 +102,48 @@ int main(int argc, char** argv){
 
 		// Find possible move directions
 		bool backtrack = 0;
-		bool tryAgain = 0;
 
 		uchar possDirs[4];
-		uchar possTotal = 0;
+		double possChance[4];
 		uchar possCount = 0;
+		double possTotal = 0;
 		for (uchar dir = 0; dir < 4; dir++) {
 			if (checkMove(dir, x, y) == 1){
-				if (dir == moveDir){
-					if ((double)rand() / RAND_MAX >= turnBias){
-						goto chosen;
-					} else {
-						tryAgain = 1;
-					}
-				} else {
-					possDirs[possCount] = dir;
-					possTotal += dirBias[dir];
-					possCount++;
-				}
+				possDirs[possCount] = dir;
+				possChance[possCount] = ((dir == moveDir) ? straightBias : (1 - straightBias)) *
+																((dir % 2 == 0) ? axisBias : (1 - axisBias)) *
+																((dir != lastTurnDir) ? momentumBias : (1 - momentumBias));
+
+				possTotal += possChance[possCount];
+				possCount++;
 			}
 		}
 
 		// Decide on move Dir
-		if (possTotal != 0){
-			uchar random = rand() % possTotal;
-			uchar possMatch = 0;
+		if (possCount != 0){
+			double random = ((double)rand() / RAND_MAX) * possTotal;
+			double possMatch = 0; // Running total (needed)
 			for (uchar poss = 0; poss < possCount; poss++) {
-				possMatch += dirBias[possDirs[poss]];
-				if (random < possMatch){
+				possMatch += possChance[poss];
+				if (random <= possMatch){
+					if (possDirs[poss] != moveDir) lastTurnDir = moveDir; // Determine turn for momentumBias
+
 					moveDir = possDirs[poss];
 					goto chosen;
 				}
 			}
-			printf("hi\n");
+			fprintf(stderr, "Failed to choose\n");
+			goto finish;
 			chosen:
 			distance++;
 		} else {
-			if (tryAgain == 1) goto chosen;
 			// Backtrack
 			if (findBacktrack(distance, x, y) == 10) goto finish;
 			moveDir = findBacktrack(distance, x, y);
 			backtrack = 1;
 			distance--;
+
+			lastTurnDir = 5; // Determine turn for momentumBias
 		}
 
 		// Move
