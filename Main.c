@@ -7,16 +7,25 @@ typedef unsigned int uint;
 typedef unsigned char uchar;
 typedef char bool;
 /*
+normal
 {{14, 29, 30, 31, 16},
 {16, 17, 2, -13, -14}};
+
+{{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+
+diag
+{{30, 31, 32, 17, 2},
+{-30, -29, -28, -13, 2}};
+
+{{1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
 */
 const char checkPatterns[2][5] = {{14, 29, 30, 31, 16},
 																	{16, 17, 2, -13, -14}};
 const char dirNormals[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
 const double axisBias = 0.5; // 0 = horizontal only, 1 = vertical only
-const double straightBias = 0.9;
-const double momentumBias = 0.1;
+const double straightBias = 0.5;
+const double momentumBias = 0.5;
 
 BMP* bmp;
 
@@ -47,7 +56,7 @@ bool checkMove(uchar dir, uint x, uint y){
 
 uchar findBacktrack(uchar currentDistance, uint x, uint y){
 	uchar r, g, b;
-	currentDistance--;
+	currentDistance--; if (currentDistance == 0) currentDistance--;
 	for (uchar dir = 0; dir < 4; dir++) {
 		get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &g, &b);
 		if (g == currentDistance && r != 0){
@@ -83,7 +92,7 @@ int main(int argc, char** argv){
 	// Create variables
 	uint startx, starty;
   uint x, y;
-	uchar distance = 0;
+	uchar distance = 1;
 	uchar moveDir = 5; // 5 So it can be checked by straight bias
 	uchar lastTurnDir = 5;
 
@@ -135,13 +144,13 @@ int main(int argc, char** argv){
 			fprintf(stderr, "Failed to choose\n");
 			goto finish;
 			chosen:
-			distance++;
+			distance++; if (distance == 0) distance++;
 		} else {
 			// Backtrack
 			if (findBacktrack(distance, x, y) == 10) goto finish;
 			moveDir = findBacktrack(distance, x, y);
 			backtrack = 1;
-			distance--;
+			distance--; if (distance == 0) distance--;
 
 			lastTurnDir = 5; // Determine turn for momentumBias
 		}
