@@ -18,16 +18,25 @@ diag
 {-30, -29, -28, -13, 2}};
 
 {{1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
+
+spaced
+{{13, 14, 16, 17, 28, 29, 30, 31, 32, 43, 44, 45, 46, 47},
+{31, 32, 33, 16, 17, 18, 2, 3, -14, -13, -12, -29, -28, -27}};
+(more efficeint approximation)
+{{13, 28, 43, 44, 45, 46, 47, 32, 17},
+{31, 32, 33, 18, 3, -12, -27, -28, -29}};
 */
-const char checkPatterns[2][5] = {{14, 29, 30, 31, 16},
-																	{16, 17, 2, -13, -14}};
+const char checkPatterns[2][5] =
+{{14, 29, 30, 31, 16},
+{16, 17, 2, -13, -14}};
 const char dirNormals[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
-const double axisBias = 0.5; // 0 = horizontal only, 1 = vertical only
+const double axisBias = 0; // 0 = horizontal, 1 = vertical
 const double straightBias = 0.5;
 const double momentumBias = 0.5;
 
 BMP* bmp;
+uchar pass = 1;
 
 void indexToPos(char index, char* x, char* y){
 	*x = (((abs(index) + 7) % 15) - 7) * ((index > 0) - (index < 0));
@@ -55,13 +64,14 @@ bool checkMove(uchar dir, uint x, uint y){
 }
 
 uchar findBacktrack(uchar currentDistance, uint x, uint y){
-	uchar r, g, b;
+	uchar r, a, b;
 	currentDistance--; if (currentDistance == 0) currentDistance--;
 	for (uchar dir = 0; dir < 4; dir++) {
-		get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &g, &b);
-		if (g == currentDistance && r != 0){
-			return dir;
-		}
+		if (pass % 2 == 0) get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &a, &b);
+		else get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &b, &a);
+
+		if (b != 0 && r != 0) {printf("uh oh\n");return dir + 4;}
+		if (a == currentDistance && r != 0) return dir;
 	}
 	fprintf(stderr, "stranded\n");
 	return 10;
@@ -101,7 +111,8 @@ int main(int argc, char** argv){
 	starty = y = atoi(argv[4]);
 
 	// Set Start pixel
-	set_pixel_rgb(bmp, x, y, 5, 0, 255);
+	if (pass % 2 == 0) set_pixel_rgb(bmp, x, y, 255, distance, 0);
+	else set_pixel_rgb(bmp, x, y, 255, 0, distance);
 
 	// Main loop
 	printf("Starting loop...\n\n");
@@ -146,11 +157,14 @@ int main(int argc, char** argv){
 			chosen:
 			distance++; if (distance == 0) distance++;
 		} else {
-			// Backtrack
-			if (findBacktrack(distance, x, y) == 10) goto finish;
-			moveDir = findBacktrack(distance, x, y);
-			backtrack = 1;
-			distance--; if (distance == 0) distance--;
+			// backtrack
+			uchar result = findBacktrack(distance, x, y);
+			if (result == 10) goto finish;
+			moveDir = result % 4;
+			if (result < 4){
+				backtrack = 1;
+				distance--; if (distance == 0) distance--;
+			} else distance++; if (distance == 0) distance++;
 
 			lastTurnDir = 5; // Determine turn for momentumBias
 		}
@@ -161,7 +175,8 @@ int main(int argc, char** argv){
 
 		// Set pixel value
 		if (!backtrack){
-			set_pixel_rgb(bmp, x, y, 255, distance, 0);
+			if (pass % 2 == 0) set_pixel_rgb(bmp, x, y, 255, distance, 0);
+			else set_pixel_rgb(bmp, x, y, 255, 0, distance);
 		}
   }
 
@@ -170,7 +185,7 @@ finish:
 		// Show finish point
 		printf("finish pos: %d %d\n", x, y);
 		printf("steps: %lu\n", stepCounter);
-		set_pixel_rgb(bmp, x, y, 5, 255, 0);
+		//set_pixel_rgb(bmp, x, y, 5, 255, 100);
 
 	  // Write bmp contents to file
 	  bwrite(bmp, argv[2]);
