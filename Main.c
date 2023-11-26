@@ -30,6 +30,10 @@ spaced (14)
 super spaced (28)
 {{57, 58, 59, 60, 61, 62, 63, 42, 43, 44, 45, 46, 47, 48, 27, 28, 29, 30, 31, 32, 33, 12, 13, 14, 15, 16, 17, 18},
 {46, 47, 48, 49, 31, 32, 33, 34, 16, 17, 18, 19, 1, 2, 3, 4, -14, -13, -12, -11, -29, -28, -27, -26, -44, -43, -42, -41}};
+
+super mega spaced insecure (23)
+{{14, 13, 12, 11, 26, 41, 56, 71, 72, 73, 74, 75, 76, 77, 78, 79, 64, 49, 34, 19, 18, 17, 16},
+{16, 31, 46, 61, 62, 63, 64, 65, 50, 35, 20, 5, -10, -25, -40, -55, -56, -57, -58, 59, -44, -29, -14}};
 */
 const char checkPatterns[2][5] =
 {{14, 29, 30, 31, 16},
@@ -37,7 +41,7 @@ const char checkPatterns[2][5] =
 const char dirNormals[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
 const double axisBias = 0.5; // 0 = horizontal, 1 = vertical
-const double straightBias = 0.5;
+const double straightBias = 0.1;
 const double momentumBias = 0.5;
 
 BMP* bmp;
@@ -154,7 +158,6 @@ int main(int argc, char** argv){
 	setup(argc, argv);
 
 	// Create variables
-	uint startx, starty;
   uint x, y;
 	uchar distance = 1;
 	uchar moveDir = 4; // 4 So it can be checked by straight bias
@@ -162,8 +165,8 @@ int main(int argc, char** argv){
 	bool backtrack = 0;
 
 	// Assign start values
-	startx = x = atoi(argv[3]);
-	starty = y = atoi(argv[4]);
+	x = atoi(argv[3]);
+	y = atoi(argv[4]);
 
 	// Set Start pixel
 	if (pass % 2 == 0) set_pixel_rgb(bmp, x, y, 255, distance, 0);
@@ -172,7 +175,7 @@ int main(int argc, char** argv){
 	// Main loop
 	printf("Starting loop...\n\n");
 	unsigned long stepCounter = 0;
-  while ((x != startx || y != starty || stepCounter == 0)){
+  while (1){
 		stepCounter++;
 
 		moveDir = findPath(x, y, moveDir, lastTurnDir, &distance);
