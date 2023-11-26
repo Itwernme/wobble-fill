@@ -131,6 +131,7 @@ unsigned int get_depth(BMP* bmp)
 
 void get_pixel_rgb(BMP* bmp, int x, int y, unsigned char* r, unsigned char* g, unsigned char* b)
 {
+	free(r); free(g); free(b);
 	int index = y * bmp->width + x;
 	if (index < 0 || index > bmp->width * bmp->height){
 		// Every pixel outside is white
@@ -138,6 +139,7 @@ void get_pixel_rgb(BMP* bmp, int x, int y, unsigned char* r, unsigned char* g, u
 		*g = 255;
 		*b = 255;
 		printf("Looking outside image\n");
+		return;
 	}
 	*r = bmp->pixels[index].red;
 	*g = bmp->pixels[index].green;
@@ -146,14 +148,21 @@ void get_pixel_rgb(BMP* bmp, int x, int y, unsigned char* r, unsigned char* g, u
 
 unsigned char get_pixel_r(BMP* bmp, int x, int y)
 {
-	//printf("sucees\n\n");
 	int index = y * bmp->width + x;
 	if (index < 0 || index > bmp->width * bmp->height){
 		// Every pixel outside is white
-		return 255;
 		printf("Looking outside image\n");
+		return 255;
 	}
 	return bmp->pixels[index].red;
+}
+
+void get_pixel(BMP* bmp, int x, int y, pixel* pix)
+{
+	free(pix);
+	int index = y * bmp->width + x;
+	if (index < 0 || index > bmp->width * bmp->height) _throw_error("Looking outside image");
+	*pix = bmp->pixels[index];
 }
 
 void set_pixel_rgb(BMP* bmp, int x, int y, unsigned char r, unsigned char g, unsigned char b)

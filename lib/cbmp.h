@@ -3,7 +3,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-  #endif
+	#endif
 
   // Pixel structure
   // Not meant to be edited directly
@@ -43,6 +43,7 @@ extern "C" {
   int get_height(BMP* bmp);
   unsigned int get_depth(BMP* bmp);
   void get_pixel_rgb(BMP* bmp, int x, int y, unsigned char* r, unsigned char* g, unsigned char* b);
+	void get_pixel(BMP* bmp, int x, int y, pixel* pix);
 	unsigned char get_pixel_r(BMP* bmp, int x, int y);
   void set_pixel_rgb(BMP* bmp, int x, int y, unsigned char r, unsigned char g, unsigned char b);
   void bwrite(BMP* bmp, char* file_name);

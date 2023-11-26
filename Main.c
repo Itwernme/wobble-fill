@@ -6,6 +6,7 @@
 typedef unsigned int uint;
 typedef unsigned char uchar;
 typedef char bool;
+
 /*
 normal
 {{14, 29, 30, 31, 16},
@@ -19,19 +20,23 @@ diag
 
 {{1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
 
-spaced
+spaced (14)
 {{13, 14, 16, 17, 28, 29, 30, 31, 32, 43, 44, 45, 46, 47},
 {31, 32, 33, 16, 17, 18, 2, 3, -14, -13, -12, -29, -28, -27}};
 (more efficeint approximation)
 {{13, 28, 43, 44, 45, 46, 47, 32, 17},
 {31, 32, 33, 18, 3, -12, -27, -28, -29}};
+
+super spaced (28)
+{{57, 58, 59, 60, 61, 62, 63, 42, 43, 44, 45, 46, 47, 48, 27, 28, 29, 30, 31, 32, 33, 12, 13, 14, 15, 16, 17, 18},
+{46, 47, 48, 49, 31, 32, 33, 34, 16, 17, 18, 19, 1, 2, 3, 4, -14, -13, -12, -11, -29, -28, -27, -26, -44, -43, -42, -41}};
 */
 const char checkPatterns[2][5] =
 {{14, 29, 30, 31, 16},
 {16, 17, 2, -13, -14}};
 const char dirNormals[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
-const double axisBias = 0; // 0 = horizontal, 1 = vertical
+const double axisBias = 0.5; // 0 = horizontal, 1 = vertical
 const double straightBias = 0.5;
 const double momentumBias = 0.5;
 
@@ -41,13 +46,6 @@ uchar pass = 1;
 void indexToPos(char index, char* x, char* y){
 	*x = (((abs(index) + 7) % 15) - 7) * ((index > 0) - (index < 0));
 	*y = (index - x[0]) / 15;
-}
-
-uchar dirRotated(uchar direction, char rotation){
-	while (rotation < 0){
-		rotation += 4;
-	}
-	return (direction + rotation) % 4;
 }
 
 bool checkMove(uchar dir, uint x, uint y){
@@ -63,18 +61,74 @@ bool checkMove(uchar dir, uint x, uint y){
 	return (hits > 0) ? 0 : 1;
 }
 
-uchar findBacktrack(uchar currentDistance, uint x, uint y){
-	uchar r, a, b;
+uchar findPath(uint x, uint y, uchar lastDir, uchar lastTurnDir, uchar* currentDistance){
+	// Find possible move directions
+	uchar possDirs[4];
+	double possChance[4];
+	uchar possCount = 0;
+	double possTotal = 0;
+
+	for (uchar dir = 0; dir < 4; dir++) {
+		if (checkMove(dir, x, y) == 1){
+			possDirs[possCount] = dir;
+			possChance[possCount] = ((dir == lastDir) ? straightBias : (1 - straightBias)) *
+															((dir % 2 == 0) ? axisBias : (1 - axisBias)) *
+															((dir != lastTurnDir) ? momentumBias : (1 - momentumBias));
+
+			possTotal += possChance[possCount];
+			possCount++;
+		}
+	}
+
+	// Decide on move Dir
+	if (possCount != 0){
+		double random = ((double)rand() / RAND_MAX) * possTotal;
+		double possMatch = 0; // Running total (needed)
+
+		for (uchar poss = 0; poss < possCount; poss++) {
+			possMatch += possChance[poss];
+
+			if (random <= possMatch){
+				if (possDirs[poss] != lastDir) lastTurnDir = lastDir; // Determine turn for momentumBias
+
+				(*currentDistance)++; if ((*currentDistance) == 0) (*currentDistance)++;
+				return possDirs[poss];
+			}
+		}
+	}
+	return 4;
+}
+
+void getSurroundings(uint x, uint y, pixel* out){
+	for (uchar dir = 0; dir < 4; dir++) {
+		pixel pix;
+		get_pixel(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &pix);
+		out[dir] = pix;
+	}
+}
+
+uchar findForwardtrack(pixel* surround){
+	for (uchar dir = 0; dir < 4; dir++) {
+		if (pass % 2 == 0){
+			if ((&surround[dir])->blue != 0 && (&surround[dir])->red != 0) return dir;
+		} else {
+			if ((&surround[dir])->green != 0 && (&surround[dir])->red != 0) return dir;
+		}
+	}
+	return 4;
+}
+
+uchar findBacktrack(uchar currentDistance, pixel* surround){
 	currentDistance--; if (currentDistance == 0) currentDistance--;
 	for (uchar dir = 0; dir < 4; dir++) {
-		if (pass % 2 == 0) get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &a, &b);
-		else get_pixel_rgb(bmp, x + dirNormals[dir][0], y + dirNormals[dir][1], &r, &b, &a);
-
-		if (b != 0 && r != 0) {printf("uh oh\n");return dir + 4;}
-		if (a == currentDistance && r != 0) return dir;
+		if (pass % 2 == 0){
+			if ((&surround[dir])->green == currentDistance && (&surround[dir])->red != 0) return dir;
+		} else {
+			if ((&surround[dir])->blue == currentDistance && (&surround[dir])->red != 0) return dir;
+		}
 	}
-	fprintf(stderr, "stranded\n");
-	return 10;
+	printf("stranded\n");
+	return 4;
 }
 
 void setup(int argc, char** argv){
@@ -103,8 +157,9 @@ int main(int argc, char** argv){
 	uint startx, starty;
   uint x, y;
 	uchar distance = 1;
-	uchar moveDir = 5; // 5 So it can be checked by straight bias
-	uchar lastTurnDir = 5;
+	uchar moveDir = 4; // 4 So it can be checked by straight bias
+	uchar lastTurnDir = 4;
+	bool backtrack = 0;
 
 	// Assign start values
 	startx = x = atoi(argv[3]);
@@ -120,53 +175,26 @@ int main(int argc, char** argv){
   while ((x != startx || y != starty || stepCounter == 0)){
 		stepCounter++;
 
-		// Find possible move directions
-		bool backtrack = 0;
+		moveDir = findPath(x, y, moveDir, lastTurnDir, &distance);
+		backtrack = 0;
 
-		uchar possDirs[4];
-		double possChance[4];
-		uchar possCount = 0;
-		double possTotal = 0;
-		for (uchar dir = 0; dir < 4; dir++) {
-			if (checkMove(dir, x, y) == 1){
-				possDirs[possCount] = dir;
-				possChance[possCount] = ((dir == moveDir) ? straightBias : (1 - straightBias)) *
-																((dir % 2 == 0) ? axisBias : (1 - axisBias)) *
-																((dir != lastTurnDir) ? momentumBias : (1 - momentumBias));
+		if (moveDir == 4){
+			pixel surroundings[4];
+			getSurroundings(x, y, surroundings);
+			moveDir = findForwardtrack(surroundings);
 
-				possTotal += possChance[possCount];
-				possCount++;
-			}
-		}
+			if (moveDir == 4){
+				moveDir = findBacktrack(distance, surroundings);
 
-		// Decide on move Dir
-		if (possCount != 0){
-			double random = ((double)rand() / RAND_MAX) * possTotal;
-			double possMatch = 0; // Running total (needed)
-			for (uchar poss = 0; poss < possCount; poss++) {
-				possMatch += possChance[poss];
-				if (random <= possMatch){
-					if (possDirs[poss] != moveDir) lastTurnDir = moveDir; // Determine turn for momentumBias
+				if (moveDir == 4) goto finish;
 
-					moveDir = possDirs[poss];
-					goto chosen;
-				}
-			}
-			fprintf(stderr, "Failed to choose\n");
-			goto finish;
-			chosen:
-			distance++; if (distance == 0) distance++;
-		} else {
-			// backtrack
-			uchar result = findBacktrack(distance, x, y);
-			if (result == 10) goto finish;
-			moveDir = result % 4;
-			if (result < 4){
 				backtrack = 1;
 				distance--; if (distance == 0) distance--;
-			} else distance++; if (distance == 0) distance++;
+			} else {
+				distance++; if (distance == 0) distance++;
+			}
 
-			lastTurnDir = 5; // Determine turn for momentumBias
+			lastTurnDir = 4; // Determine turn for momentumBias
 		}
 
 		// Move
@@ -174,7 +202,7 @@ int main(int argc, char** argv){
 		y += dirNormals[moveDir][1];
 
 		// Set pixel value
-		if (!backtrack){
+		if (backtrack == 0){
 			if (pass % 2 == 0) set_pixel_rgb(bmp, x, y, 255, distance, 0);
 			else set_pixel_rgb(bmp, x, y, 255, 0, distance);
 		}
